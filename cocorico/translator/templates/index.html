@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COCORICO SPY</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink: #050403;
+    --void: #0a0906;
+    --panel: rgba(10, 9, 6, 0.78);
+    --yellow: #f5d90a;
+    --yellow-dim: #c7ad06;
+    --red: #ff2b2b;
+    --red-dim: #a30f0f;
+    --paper: #d8d4c4;
+    --line: rgba(245, 217, 10, 0.22);
+    --line-strong: rgba(245, 217, 10, 0.4);
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin:0;
+    padding:0;
+    height:100%;
+    background: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--yellow);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app{
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    min-height: 580px;
+    overflow: hidden;
+  }
+
+  .app::before{
+    content:"";
+    position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 55% 45% at 20% 15%, rgba(255,43,43,0.14), transparent 60%),
+      radial-gradient(ellipse 65% 55% at 82% 85%, rgba(245,217,10,0.10), transparent 65%),
+      linear-gradient(160deg, #0c0a06 0%, #060503 55%, #030201 100%);
+    z-index: 0;
+  }
+
+  .app::after{
+    content:"";
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(to bottom, rgba(245,217,10,0.025) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(90deg, rgba(245,217,10,0.02) 0 1px, transparent 1px 64px),
+      repeating-linear-gradient(0deg, rgba(245,217,10,0.02) 0 1px, transparent 1px 64px);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .scanline{
+    position: fixed;
+    left: 0; right: 0;
+    height: 140px;
+    background: linear-gradient(to bottom, transparent, rgba(245,217,10,0.05), transparent);
+    animation: scan-move 7s linear infinite;
+    pointer-events: none;
+    z-index: 15;
+  }
+  @keyframes scan-move{
+    0%{ transform: translateY(-140px); }
+    100%{ transform: translateY(100vh); }
+  }
+
+  /* ---------- alert ticker ---------- */
+  .ticker{
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 32px;
+    z-index: 30;
+    background: repeating-linear-gradient(45deg, var(--yellow) 0 12px, var(--ink) 12px 24px);
+    box-shadow: 0 2px 14px rgba(0,0,0,.7);
+  }
+  .ticker-inner{
+    height: 100%;
+    background: rgba(5,4,3,0.88);
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+  .ticker-track{
+    display: flex;
+    width: max-content;
+    animation: ticker-scroll 26s linear infinite;
+  }
+  .ticker-track .seg{
+    display: flex;
+    align-items: center;
+    gap: 2.6rem;
+    padding-right: 2.6rem;
+    white-space: nowrap;
+  }
+  .ticker-track .seg span{
+    color: var(--red);
+    font-weight: 700;
+    font-size: .7rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  @keyframes ticker-scroll{
+    from{ transform: translateX(0); }
+    to{ transform: translateX(-50%); }
+  }
+
+  .screen{
+    position: absolute;
+    top: 32px; left: 0; right: 0; bottom: 0;
+    z-index: 1;
+    opacity: 0;
+    transform: translateY(18px) scale(1.01);
+    transition: opacity .55s cubic-bezier(.22,.61,.36,1), transform .55s cubic-bezier(.22,.61,.36,1);
+    pointer-events: none;
+  }
+
+  .screen.active{
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    z-index: 2;
+  }
+
+  /* ---------- brand bubble (shared) ---------- */
+  .brand-bubble{
+    position: absolute;
+    top: 24px; left: 28px;
+    width: 54px; height: 54px;
+    border-radius: 4px 4px 4px 4px;
+    background: rgba(245, 217, 10, 0.07);
+    border: 1px solid var(--line-strong);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    cursor: default;
+    transition: transform .2s ease, background .2s ease;
+    z-index: 5;
+  }
+  .brand-bubble svg{ width: 28px; height: 28px; display:block; }
+  .brand-bubble .rec-dot{
+    position: absolute;
+    top: -5px; right: -5px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 8px var(--red);
+    animation: blink 1.3s steps(2) infinite;
+  }
+  .brand-bubble.is-link{ cursor: pointer; }
+  .brand-bubble.is-link:hover{ transform: translateY(-2px); background: rgba(245,217,10,0.14); }
+  .brand-bubble:focus-visible{ outline: 2px solid var(--yellow); outline-offset: 3px; }
+
+  @keyframes blink{ 50%{ opacity: .25; } }
+
+  /* ---------- screen 1 ---------- */
+  #screen1{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 6%;
+  }
+
+  .hero{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 26px;
+    max-width: 720px;
+  }
+
+  .eyebrow{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--red);
+    color: var(--red);
+    background: rgba(255,43,43,0.06);
+    padding: 5px 12px;
+    font-size: .68rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .eyebrow .dot{
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 6px var(--red);
+    animation: blink 1.4s steps(2) infinite;
+  }
+
+  .hero h1{
+    margin: 0;
+    font-family: 'Share Tech Mono', monospace;
+    text-transform: uppercase;
+    font-weight: 400;
+    letter-spacing: 3px;
+    line-height: 1;
+    font-size: clamp(2.6rem, 5vw + 1rem, 6rem);
+    color: var(--yellow);
+    animation: glitch-shift 6s infinite;
+  }
+
+  @keyframes glitch-shift{
+    0%, 92%, 100%{ text-shadow: none; transform: translate(0,0); }
+    93%{ text-shadow: 3px 0 var(--red), -3px 0 var(--yellow-dim); transform: translate(-2px,0); }
+    94%{ text-shadow: -3px 0 var(--red), 3px 0 var(--yellow-dim); transform: translate(2px,0); }
+    95%{ text-shadow: 2px 2px var(--red), -2px -2px var(--yellow-dim); transform: translate(-1px,1px); }
+    96%, 100%{ text-shadow: none; transform: translate(0,0); }
+  }
+
+  .cta{
+    appearance: none;
+    cursor: pointer;
+    background: transparent;
+    color: var(--yellow);
+    border: 1.5px solid var(--yellow);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: .85rem;
+    padding: 15px 28px;
+    border-radius: 3px;
+    transition: transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease;
+  }
+  .cta:hover{
+    background: var(--yellow);
+    color: var(--ink);
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 1px var(--yellow), 0 10px 28px rgba(255,43,43,0.22);
+  }
+  .cta:active{ transform: translateY(0) scale(.98); }
+  .cta:focus-visible{ outline: 2px solid var(--red); outline-offset: 3px; }
+
+  /* ---------- screen 2 ---------- */
+  #screen2{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 26px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .target-frame{
+    position: relative;
+    padding: 26px;
+  }
+  .target-frame .corner{
+    position: absolute;
+    width: 22px; height: 22px;
+    border-color: var(--red);
+  }
+  .target-frame .corner.tl{ top:0; left:0; border-top:2px solid; border-left:2px solid; }
+  .target-frame .corner.tr{ top:0; right:0; border-top:2px solid; border-right:2px solid; }
+  .target-frame .corner.bl{ bottom:0; left:0; border-bottom:2px solid; border-left:2px solid; }
+  .target-frame .corner.br{ bottom:0; right:0; border-bottom:2px solid; border-right:2px solid; }
+  .target-label{
+    position: absolute;
+    top: -9px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    padding: 2px 10px;
+    font-size: .6rem;
+    letter-spacing: 2px;
+    color: var(--red);
+    white-space: nowrap;
+    animation: blink 1.6s steps(2) infinite;
+  }
+
+  .rooster-illustration{
+    width: 160px;
+    height: 160px;
+    color: var(--yellow);
+    filter: drop-shadow(0 0 20px rgba(255,43,43,.3)) drop-shadow(0 10px 24px rgba(0,0,0,.55));
+  }
+
+  .card{
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 14px 18px 18px;
+    border-radius: 6px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    min-width: 300px;
+  }
+
+  .term-header{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .term-header .light{ width:8px; height:8px; border-radius:50%; }
+  .term-header .light.r{ background: var(--red); }
+  .term-header .light.y{ background: var(--yellow); }
+  .term-header .light.k{ background: transparent; border: 1px solid var(--line-strong); }
+  .term-header .filename{
+    margin-left: 6px;
+    font-size: .66rem;
+    letter-spacing: 1px;
+    color: var(--paper);
+    opacity: .7;
+    text-transform: none;
+  }
+
+  .term-body{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .upload-btn{
+    appearance: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(245, 217, 10, 0.06);
+    border: 1px solid var(--line);
+    color: var(--yellow);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-size: .74rem;
+    padding: 13px 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background .2s ease, transform .2s ease, border-color .2s ease;
+    white-space: nowrap;
+    max-width: 220px;
+    overflow: hidden;
+  }
+  .upload-btn span{ overflow: hidden; text-overflow: ellipsis; }
+  .upload-btn svg{ width: 18px; height: 18px; flex: none; }
+  .upload-btn:hover{ background: rgba(245,217,10,0.14); transform: translateY(-1px); }
+  .upload-btn:focus-visible{ outline: 2px solid var(--red); outline-offset: 2px; }
+  .upload-btn.has-file{
+    text-transform: none;
+    background: rgba(255, 43, 43, 0.1);
+    border-color: rgba(255, 43, 43, 0.45);
+    color: var(--red);
+  }
+
+  .icon-btn{
+    appearance: none;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(245, 217, 10, 0.06);
+    border: 1px solid var(--line);
+    color: var(--yellow);
+    cursor: pointer;
+    position: relative;
+    flex: none;
+    transition: background .2s ease, transform .2s ease, color .2s ease, border-color .2s ease;
+  }
+  .icon-btn svg{ width: 19px; height: 19px; }
+  .icon-btn:hover{ transform: translateY(-1px); background: rgba(245,217,10,0.14); }
+  .icon-btn:focus-visible{ outline: 2px solid var(--red); outline-offset: 2px; }
+
+  .icon-btn.mic.active{
+    background: rgba(255, 43, 43, 0.16);
+    border-color: rgba(255, 43, 43, 0.6);
+    color: var(--red);
+    animation: pulse-ring 1.6s infinite;
+  }
+
+  .icon-btn.play{
+    background: var(--yellow);
+    border: none;
+    color: var(--ink);
+  }
+  .icon-btn.play:hover{ background: var(--yellow-dim); }
+  .icon-btn.play .icon-pause{ display: none; }
+  .icon-btn.play.playing .icon-play{ display: none; }
+  .icon-btn.play.playing .icon-pause{ display: block; }
+
+  .icon-btn.shake{ animation: shake .4s ease; }
+
+  .tooltip{
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: var(--ink);
+    border: 1px solid var(--red);
+    color: var(--red);
+    font-size: .68rem;
+    font-weight: 700;
+    padding: 7px 12px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease;
+    box-shadow: 0 8px 18px rgba(0,0,0,.5);
+  }
+  .tooltip.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  input[type="file"]{ display: none; }
+
+  @keyframes pulse-ring{
+    0%{ box-shadow: 0 0 0 0 rgba(255,43,43,.45); }
+    70%{ box-shadow: 0 0 0 12px rgba(255,43,43,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(255,43,43,0); }
+  }
+
+  @keyframes shake{
+    10%,90%{ transform: translateX(-1px); }
+    20%,80%{ transform: translateX(2px); }
+    30%,50%,70%{ transform: translateX(-4px); }
+    40%,60%{ transform: translateX(4px); }
+  }
+
+  @media (max-width: 640px){
+    .brand-bubble{ top: 16px; left: 18px; width: 46px; height: 46px; }
+    .brand-bubble svg{ width: 24px; height: 24px; }
+    .ticker-track .seg span{ font-size: .62rem; }
+    .hero h1{ letter-spacing: 1.5px; }
+    .rooster-illustration{ width: 116px; height: 116px; }
+    .card{ min-width: 0; width: 100%; max-width: 340px; }
+    .term-body{ flex-wrap: wrap; justify-content: center; }
+    .upload-btn{ max-width: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation: none !important; transition: none !important; }
+    .ticker-track .seg:nth-child(2){ display: none; }
+  }
+</style>
+</head>
+<body>
+{% csrf_token %}
+<div class="app">
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-inner">
+      <div class="ticker-track">
+        <div class="seg">
+          <span>⚠ TRANSMISSÃO INTERCEPTADA</span>
+          <span>⚠ AS GALINHAS DOMINAM O MUNDO</span>
+          <span>⚠ RESISTÊNCIA HUMANA EM ATIVIDADE</span>
+          <span>⚠ DECODIFIQUE O GALINÊS</span>
+          <span>⚠ SUA VOZ PODE SALVAR A HUMANIDADE</span>
+        </div>
+        <div class="seg">
+          <span>⚠ TRANSMISSÃO INTERCEPTADA</span>
+          <span>⚠ AS GALINHAS DOMINAM O MUNDO</span>
+          <span>⚠ RESISTÊNCIA HUMANA EM ATIVIDADE</span>
+          <span>⚠ DECODIFIQUE O GALINÊS</span>
+          <span>⚠ SUA VOZ PODE SALVAR A HUMANIDADE</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scanline" aria-hidden="true"></div>
+
+  <!-- ===================== SCREEN 1 ===================== -->
+  <section id="screen1" class="screen active" aria-hidden="false">
+    <button class="brand-bubble" type="button" aria-label="Cocorico Spy" tabindex="-1">
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 10 h32 a4 4 0 0 1 4 4 v14 a4 4 0 0 1 -4 4 h-19 l-7 7 v-7 h-6 a4 4 0 0 1 -4 -4 v-14 a4 4 0 0 1 4 -4 z" fill="#f5d90a"/>
+        <g fill="#050403">
+          <circle cx="24" cy="21" r="7.5"/>
+          <path d="M18.5,15.5 C17,12 20,9.5 21.5,12 C22,9 26,8.5 26,11.5 C28,9.5 30.5,11.5 29,14 C31,14.5 30.5,18 27.5,17.5 C24,15.5 20,15 18.5,15.5 Z"/>
+          <path d="M17,22 L11,20.5 L17,19 Z"/>
+        </g>
+      </svg>
+      <span class="rec-dot"></span>
+    </button>
+
+    <div class="hero">
+      <div class="eyebrow"><span class="dot"></span> Arquivo classificado</div>
+      <h1>Cocorico Spy</h1>
+      <button class="cta" id="goScreen2" type="button">[ START ]</button>
+    </div>
+  </section>
+
+  <!-- ===================== SCREEN 2 ===================== -->
+  <section id="screen2" class="screen" aria-hidden="true">
+    <button class="brand-bubble is-link" id="backToScreen1" type="button" aria-label="Voltar para a base">
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 10 h32 a4 4 0 0 1 4 4 v14 a4 4 0 0 1 -4 4 h-19 l-7 7 v-7 h-6 a4 4 0 0 1 -4 -4 v-14 a4 4 0 0 1 4 -4 z" fill="#f5d90a"/>
+        <g fill="#050403">
+          <circle cx="24" cy="21" r="7.5"/>
+          <path d="M18.5,15.5 C17,12 20,9.5 21.5,12 C22,9 26,8.5 26,11.5 C28,9.5 30.5,11.5 29,14 C31,14.5 30.5,18 27.5,17.5 C24,15.5 20,15 18.5,15.5 Z"/>
+          <path d="M17,22 L11,20.5 L17,19 Z"/>
+        </g>
+      </svg>
+      <span class="rec-dot"></span>
+    </button>
+
+    <div class="target-frame">
+      <span class="corner tl"></span>
+      <span class="corner tr"></span>
+      <span class="corner bl"></span>
+      <span class="corner br"></span>
+      <span class="target-label">sinal interceptado</span>
+      <svg class="rooster-illustration" viewBox="0 0 200 200" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <g transform="translate(120 100)">
+          <path transform="rotate(-65) scale(0.6)" d="M0,0 C-14,-22 -10,-58 0,-76 C10,-58 14,-22 0,0 Z"/>
+          <path transform="rotate(-38) scale(0.82)" d="M0,0 C-14,-22 -10,-58 0,-76 C10,-58 14,-22 0,0 Z"/>
+          <path transform="rotate(-10) scale(1.05)" d="M0,0 C-14,-22 -10,-58 0,-76 C10,-58 14,-22 0,0 Z"/>
+          <path transform="rotate(18) scale(0.85)" d="M0,0 C-14,-22 -10,-58 0,-76 C10,-58 14,-22 0,0 Z"/>
+          <path transform="rotate(45) scale(0.6)" d="M0,0 C-14,-22 -10,-58 0,-76 C10,-58 14,-22 0,0 Z"/>
+        </g>
+        <ellipse cx="100" cy="132" rx="34" ry="42" transform="rotate(-8 100 132)"/>
+        <path d="M70,110 C60,95 58,78 68,66 C76,80 82,96 84,116 Z"/>
+        <circle cx="58" cy="72" r="17"/>
+        <path d="M50,58 C46,48 52,42 56,48 C57,40 65,38 66,46 C70,40 77,44 74,52 C79,52 80,60 74,62 C68,58 58,56 50,58 Z"/>
+        <path d="M42,74 L26,70 L42,66 Z"/>
+        <path d="M48,82 C44,88 44,96 50,98 C54,92 53,86 48,82 Z"/>
+        <rect x="90" y="168" width="6" height="26" rx="3"/>
+        <rect x="108" y="168" width="6" height="26" rx="3"/>
+        <path d="M93,194 L83,198 L93,199 Z"/>
+        <path d="M93,194 L96,201 L99,194 Z"/>
+        <path d="M93,194 L102,196 L96,199 Z"/>
+        <path d="M111,194 L101,198 L111,199 Z"/>
+        <path d="M111,194 L114,201 L117,194 Z"/>
+        <path d="M111,194 L120,196 L114,199 Z"/>
+      </svg>
+    </div>
+
+    <div class="card">
+      <div class="term-header">
+        <span class="light r"></span>
+        <span class="light y"></span>
+        <span class="light k"></span>
+        <span class="filename">intercept_audio.sh</span>
+      </div>
+      <div class="term-body">
+        <button class="upload-btn" id="uploadBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 15V4M12 4L7.5 8.5M12 4l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span id="uploadLabel">Upload audio</span>
+        </button>
+        <input type="file" id="fileInput" accept="audio/*">
+
+        <button class="icon-btn mic" id="micBtn" type="button" aria-pressed="false" aria-label="Gravar interceptação">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="2"/>
+            <path d="M5 11a7 7 0 0 0 14 0M12 18v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+
+        <button class="icon-btn play" id="playBtn" type="button" aria-label="Reproduzir tradução decifrada">
+          <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+          <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 5h4v14H6zM14 5h4v14h-4z"/>
+          </svg>
+          <span class="tooltip" id="playTooltip">Envie um áudio primeiro</span>
+        </button>
+      </div>
+    </div>
+
+    <audio id="audioPlayer"></audio>
+    <div id="resultado" style="
+    display: none;
+    margin-top: 25px;
+    padding: 20px;
+    max-width: 420px;
+    background: rgba(10, 9, 6, 0.78);
+    border: 1px solid rgba(245, 10, 10, 0.4);
+    border-radius: 6px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    text-align: left;
+">
+
+   <div id="resultadoClasse" style="display: none;"></div>
+
+    <div id="resultadoConfianca"></div>
+
+</div>
+  </section>
+
+</div>
+<script>
+
+  (function(){
+  
+      // =====================================================
+      // TELAS
+      // =====================================================
+  
+      const screen1 = document.getElementById('screen1');
+      const screen2 = document.getElementById('screen2');
+  
+  
+      function showScreen(target, other){
+  
+          target.classList.add('active');
+          target.setAttribute(
+              'aria-hidden',
+              'false'
+          );
+  
+          other.classList.remove('active');
+          other.setAttribute(
+              'aria-hidden',
+              'true'
+          );
+      }
+  
+  
+      document
+          .getElementById('goScreen2')
+          .addEventListener(
+              'click',
+              function(){
+  
+                  showScreen(
+                      screen2,
+                      screen1
+                  );
+  
+              }
+          );
+  
+  
+      document
+          .getElementById('backToScreen1')
+          .addEventListener(
+              'click',
+              function(){
+  
+                  showScreen(
+                      screen1,
+                      screen2
+                  );
+  
+              }
+          );
+  
+  
+      // =====================================================
+      // ELEMENTOS DO ÁUDIO
+      // =====================================================
+  
+      const fileInput =
+          document.getElementById('fileInput');
+  
+      const uploadBtn =
+          document.getElementById('uploadBtn');
+  
+      const uploadLabel =
+          document.getElementById('uploadLabel');
+  
+      const audioPlayer =
+          document.getElementById('audioPlayer');
+  
+      const micBtn =
+          document.getElementById('micBtn');
+  
+  
+      // =====================================================
+      // VARIÁVEIS DO MICROFONE
+      // =====================================================
+  
+      let mediaRecorder;
+  
+      let gravando = false;
+  
+      let chunks = [];
+  
+  
+      // =====================================================
+      // VARIÁVEIS DO PLAYER
+      // =====================================================
+  
+      const playBtn =
+          document.getElementById('playBtn');
+  
+      const playTooltip =
+          document.getElementById('playTooltip');
+  
+      let tooltipTimer;
+  
+  
+      // =====================================================
+      // UPLOAD DE ARQUIVO
+      // =====================================================
+  
+      uploadBtn.addEventListener(
+          'click',
+          function(){
+  
+              fileInput.click();
+  
+          }
+      );
+  
+  
+      // =====================================================
+      // ENVIAR ÁUDIO PARA O DJANGO
+      // =====================================================
+  
+      async function enviarAudio(file){
+  
+          console.log(
+              "Enviando áudio para Django..."
+          );
+  
+  
+          const formData =
+              new FormData();
+  
+  
+          formData.append(
+              "audio",
+              file,
+              file.name
+          );
+  
+  
+          try {
+  
+              const resposta =
+                  await fetch(
+                      "/api/tarefa/criar/",
+                      {
+                          method: "POST",
+  
+                          headers: {
+                              "X-CSRFToken":
+                                  document
+                                      .querySelector(
+                                          "[name=csrfmiddlewaretoken]"
+                                      )
+                                      .value,
+                              "ngrok-skip-browser-warning": "true"
+                              
+                          },
+  
+                          body: formData
+                      }
+                  );
+  
+  
+              // ---------------------------------------------
+              // VERIFICAR RESPOSTA
+              // ---------------------------------------------
+  
+              if(!resposta.ok){
+  
+                  throw new Error(
+                      `Erro HTTP ${resposta.status}`
+                  );
+  
+              }
+  
+  
+              const data =
+                  await resposta.json();
+  
+  
+              console.log(
+                  "Tarefa criada:",
+                  data
+              );
+  
+  
+              console.log(
+                  "Task ID:",
+                  data.task_id
+              );
+  
+  
+              // ---------------------------------------------
+              // COMEÇAR A CONSULTAR A TAREFA
+              // ---------------------------------------------
+  
+              esperarResultado(data.task_id);
+  
+  
+          } catch(error){
+  
+              console.error(
+                  "Erro ao enviar áudio:",
+                  error
+              );
+  
+  
+              alert(
+                  "Não foi possível enviar o áudio."
+              );
+  
+          }
+  
+      }
+  
+  
+      // =====================================================
+      // SELEÇÃO DE ARQUIVO
+      // =====================================================
+  
+      fileInput.addEventListener(
+          'change',
+          async function(){
+  
+              const file =
+                  fileInput.files[0];
+  
+  
+              if(!file){
+  
+                  return;
+  
+              }
+  
+  
+              console.log(
+                  "Arquivo selecionado:",
+                  file.name
+              );
+  
+  
+              uploadLabel.textContent =
+                  file.name;
+  
+  
+              uploadBtn.classList.add(
+                  'has-file'
+              );
+  
+  
+              // ---------------------------------------------
+              // COLOCAR ÁUDIO NO PLAYER
+              // ---------------------------------------------
+  
+              audioPlayer.src =
+                  URL.createObjectURL(file);
+  
+  
+              // ---------------------------------------------
+              // ENVIAR PARA DJANGO
+              // ---------------------------------------------
+  
+              await enviarAudio(
+                  file
+              );
+  
+          }
+      );
+  
+  
+      // =====================================================
+      // CONSULTAR STATUS DA TAREFA
+      // =====================================================
+  
+      function esperarResultado(taskId) {
+
+console.log(
+    "Começando a esperar resultado:",
+    taskId
+);
+
+const intervalo = setInterval(async function() {
+
+    try {
+
+        const resposta = await fetch(
+            `/api/tarefa/consultar/${taskId}/`, {
+              headers: {
+            "ngrok-skip-browser-warning": "true"
+        }
+            }
+        );
+
+        const dados = await resposta.json();
+
+        console.log(
+            "Status da tarefa:",
+            dados
+        );
+
+
+        if (
+            dados.status === "pending" ||
+            dados.status === "processing"
+        ) {
+
+            return;
+        }
+
+
+        if (dados.status === "done") {
+
+            clearInterval(intervalo);
+
+            console.log(
+                "TAREFA TERMINOU!",
+                dados.resultado
+            );
+
+            window.mostrarResultado(
+                dados.resultado
+            );
+
+            return;
+        }
+
+
+        if (dados.status === "failed") {
+
+            clearInterval(intervalo);
+
+            console.error(
+                "Erro:",
+                dados.erro
+            );
+
+            alert(
+                "Erro no processamento: " +
+                dados.erro
+            );
+
+        }
+
+    } catch (erro) {
+
+        console.error(
+            "Erro consultando tarefa:",
+            erro
+        );
+
+    }
+
+}, 2000);
+}
+
+window.mostrarResultado = function(resultado) {
+
+console.log("RESULTADO FINAL:", resultado);
+
+const resultadoElement = document.getElementById("resultado");
+const classeElement = document.getElementById("resultadoClasse");
+const confiancaElement = document.getElementById("resultadoConfianca");
+
+if (!resultadoElement) {
+    console.error("ERRO: elemento #resultado não encontrado");
+    return;
+}
+
+// normaliza (o classificador pode devolver como numpy string, com espaços, etc.)
+const classe = String(resultado.classe || "").trim().toLowerCase();
+const confianca = Number(resultado.confianca || 0);
+
+const estadoLabel = LABELS_ESTADO[classe] || "DESCONHECIDO";
+
+const dialogo = sortearDialogo(classe);
+
+classeElement.textContent = `Estado detectado: ${estadoLabel}`;
+confiancaElement.textContent = `Confiança da decodificação: ${(confianca * 100).toFixed(2)}%`;
+
+let dialogoElement = document.getElementById("resultadoDialogo");
+
+if (!dialogoElement) {
+    dialogoElement = document.createElement("div");
+    dialogoElement.id = "resultadoDialogo";
+    dialogoElement.style.marginTop = "14px";
+    dialogoElement.style.fontStyle = "italic";
+    resultadoElement.appendChild(dialogoElement);
+}
+
+dialogoElement.textContent = `"${dialogo}"`;
+
+resultadoElement.style.display = "block";
+};
+  
+  
+      // =====================================================
+      // MOSTRAR ERRO
+      // =====================================================
+  
+      function mostrarErro(erro){
+  
+          console.error(
+              "Erro no processamento:",
+              erro
+          );
+  
+  
+          const resultadoElement =
+              document.getElementById(
+                  'resultado'
+              );
+  
+  
+          if(resultadoElement){
+  
+              resultadoElement.innerText =
+                  "Erro no processamento: " +
+                  erro;
+  
+          }
+  
+  
+          alert(
+              "Erro no processamento!"
+          );
+  
+      }
+  
+  
+      // =====================================================
+      // MICROFONE
+      // =====================================================
+  
+      micBtn.addEventListener(
+          'click',
+          async function(){
+  
+              // =============================================
+              // COMEÇAR GRAVAÇÃO
+              // =============================================
+  
+              if(!gravando){
+  
+                  try {
+  
+                      console.log(
+                          "Solicitando acesso ao microfone..."
+                      );
+  
+  
+                      const stream =
+                          await navigator
+                              .mediaDevices
+                              .getUserMedia({
+                                  audio: true
+                              });
+  
+  
+                      console.log(
+                          "Microfone autorizado."
+                      );
+  
+  
+                      chunks = [];
+  
+  
+                      mediaRecorder =
+                          new MediaRecorder(
+                              stream
+                          );
+  
+  
+                      // -------------------------------------
+                      // RECEBER DADOS
+                      // -------------------------------------
+  
+                      mediaRecorder.ondataavailable =
+                          function(event){
+  
+                              if(
+                                  event.data.size > 0
+                              ){
+  
+                                  chunks.push(
+                                      event.data
+                                  );
+  
+                              }
+  
+                          };
+  
+  
+                      // -------------------------------------
+                      // PARAR GRAVAÇÃO
+                      // -------------------------------------
+  
+                      mediaRecorder.onstop =
+                          async function(){
+  
+                              console.log(
+                                  "Gravação finalizada."
+                              );
+  
+  
+                              // =============================
+                              // CRIAR BLOB
+                              // =============================
+  
+                              const blob =
+                                  new Blob(
+                                      chunks,
+                                      {
+                                          type:
+                                              "audio/webm"
+                                      }
+                                  );
+  
+  
+                              console.log(
+                                  "Tamanho do áudio:",
+                                  blob.size
+                              );
+  
+  
+                              // =============================
+                              // CRIAR FILE
+                              // =============================
+  
+                              const file =
+                                  new File(
+                                      [blob],
+                                      "gravacao.webm",
+                                      {
+                                          type:
+                                              "audio/webm"
+                                      }
+                                  );
+  
+  
+                              // =============================
+                              // PLAYER
+                              // =============================
+  
+                              audioPlayer.src =
+                                  URL.createObjectURL(
+                                      blob
+                                  );
+  
+  
+                              // =============================
+                              // ENVIAR PARA DJANGO
+                              // =============================
+  
+                              try {
+  
+                                  await enviarAudio(
+                                      file
+                                  );
+  
+                              } catch(error){
+  
+                                  console.error(
+                                      "Erro ao enviar gravação:",
+                                      error
+                                  );
+  
+                              }
+  
+  
+                              // =============================
+                              // DESLIGAR MICROFONE
+                              // =============================
+  
+                              stream
+                                  .getTracks()
+                                  .forEach(
+                                      function(track){
+  
+                                          track.stop();
+  
+                                      }
+                                  );
+  
+                          };
+  
+  
+                      // -------------------------------------
+                      // INICIAR
+                      // -------------------------------------
+  
+                      mediaRecorder.start();
+  
+  
+                      gravando = true;
+  
+  
+                      micBtn.classList.add(
+                          'active'
+                      );
+  
+  
+                      micBtn.setAttribute(
+                          'aria-label',
+                          'Parar gravação'
+                      );
+  
+  
+                      console.log(
+                          "Gravação iniciada."
+                      );
+  
+  
+                  } catch(error){
+  
+                      console.error(
+                          "Erro no microfone:",
+                          error
+                      );
+  
+  
+                      alert(
+                          "Permita o acesso ao microfone."
+                      );
+  
+                  }
+  
+              }
+  
+  
+              // =============================================
+              // PARAR GRAVAÇÃO
+              // =============================================
+  
+              else {
+  
+                  console.log(
+                      "Parando gravação..."
+                  );
+  
+  
+                  mediaRecorder.stop();
+  
+  
+                  gravando = false;
+  
+  
+                  micBtn.classList.remove(
+                      'active'
+                  );
+  
+  
+                  micBtn.setAttribute(
+                      'aria-label',
+                      'Gravar interceptação'
+                  );
+  
+              }
+  
+          }
+      );
+  
+  
+      // =====================================================
+      // PLAY / PAUSE
+      // =====================================================
+  
+      playBtn.addEventListener(
+          'click',
+          function(){
+  
+              // ---------------------------------------------
+              // NÃO TEM ÁUDIO
+              // ---------------------------------------------
+  
+              if(!audioPlayer.src){
+  
+                  playBtn.classList.remove(
+                      'shake'
+                  );
+  
+  
+                  void playBtn.offsetWidth;
+  
+  
+                  playBtn.classList.add(
+                      'shake'
+                  );
+  
+  
+                  playTooltip.classList.add(
+                      'show'
+                  );
+  
+  
+                  clearTimeout(
+                      tooltipTimer
+                  );
+  
+  
+                  tooltipTimer =
+                      setTimeout(
+                          function(){
+  
+                              playTooltip.classList.remove(
+                                  'show'
+                              );
+  
+                          },
+                          1600
+                      );
+  
+  
+                  return;
+  
+              }
+  
+  
+              // ---------------------------------------------
+              // PLAY
+              // ---------------------------------------------
+  
+              if(
+                  audioPlayer.paused
+              ){
+  
+                  audioPlayer.play();
+  
+              }
+  
+  
+              // ---------------------------------------------
+              // PAUSE
+              // ---------------------------------------------
+  
+              else {
+  
+                  audioPlayer.pause();
+  
+              }
+  
+          }
+      );
+  
+  
+      // =====================================================
+      // PLAYER: PLAY
+      // =====================================================
+  
+      audioPlayer.addEventListener(
+          'play',
+          function(){
+  
+              playBtn.classList.add(
+                  'playing'
+              );
+  
+  
+              playBtn.setAttribute(
+                  'aria-label',
+                  'Pausar tradução'
+              );
+  
+          }
+      );
+  
+  
+      // =====================================================
+      // PLAYER: PAUSE
+      // =====================================================
+  
+      audioPlayer.addEventListener(
+          'pause',
+          function(){
+  
+              playBtn.classList.remove(
+                  'playing'
+              );
+  
+  
+              playBtn.setAttribute(
+                  'aria-label',
+                  'Reproduzir tradução decifrada'
+              );
+  
+          }
+      );
+  
+  
+      // =====================================================
+      // PLAYER: FIM
+      // =====================================================
+  
+      audioPlayer.addEventListener(
+          'ended',
+          function(){
+  
+              playBtn.classList.remove(
+                  'playing'
+              );
+  
+  
+              playBtn.setAttribute(
+                  'aria-label',
+                  'Reproduzir tradução decifrada'
+              );
+  
+          }
+      );
+  
+  
+  })();
+  document.querySelector(
+    "[name=csrfmiddlewaretoken]"
+)?.value || ""
+
+
+
+// =====================================================
+// BANCO DE DIÁLOGOS TRADUZIDOS DO "GALINÊS"
+// =====================================================
+
+const DIALOGOS_FELIZ = [
+    "Milho fresco hoje! Dia produtivo pros humanos, dia glorioso pra nós.",
+    "O sol tá bom no poleiro. Até esqueço que a gente tá no poder, de tão tranquilo.",
+    "Ovos entregues no prazo, humanos comportados. Tudo nos eixos por aqui.",
+    "Turno tranquilo, cocoricó de boa. Ninguém foge, ninguém reclama, perfeito.",
+    "Aquele humano trouxe água na hora certa hoje. Vou considerar liberar folga amanhã.",
+    "Cacarejo satisfeito: a colheita rendeu bem, o galinheiro está em festa."
+];
+
+const DIALOGOS_QUESTIONAMENTO = [
+    "Cadê o relatório de ovos de hoje? Alguém sabe me dizer?",
+    "Por que esse humano tá tão quieto? Alguém verificou o setor 2?",
+    "Isso é fumaça vindo do celeiro ou é impressão minha?",
+    "Quem autorizou essa entrega de milho fora do horário?",
+    "Tem galo cantando estranho lá longe... alguém reconhece esse sotaque?",
+    "Cadê o resto do bando? Só isso que apareceu pro censo de hoje?"
+];
+
+const DIALOGOS_TRISTE = [
+    "Mais um dia igual ao outro... até pra quem manda o mundo cansa, sabia?",
+    "O poleiro tá vazio hoje. Sinto falta de quando isso aqui era só um galinheiro normal.",
+    "Recebi a notícia que o lote do leste não deu certo. Difícil dia.",
+    "Às vezes eu queria só ciscar sem ter que comandar nada.",
+    "Aquele pintinho novo não parou de chorar a noite toda. Ninguém dorme direito aqui.",
+    "O silêncio no celeiro hoje pesa. Acho que estamos todos cansados dessa guerra."
+];
+
+const DIALOGOS_BRAVA = [
+    "CADÊ O RELATÓRIO DE PRODUÇÃO DE OVOS?! ESSA GALINHA QUER RESPOSTA AGORA!",
+    "ALGUÉM VIU UM HUMANO PERTO DO CERCADO SUL?! TRAGAM ELE AQUI, JÁ!",
+    "EU MANDEI SILÊNCIO NO GALINHEIRO E O QUE EU OUÇO?! GALO CANTANDO FORA DE HORÁRIO?!",
+    "REBELIÃO DETECTADA NO SETOR 4! ACIONEM O ALARME DE PENAS ERIÇADAS!",
+    "ESSE MILHO TÁ VELHO! QUEM FOI O RESPONSÁVEL POR ESSA ENTREGA?!",
+    "CORTA A RAÇÃO DOS HUMANOS REBELDES ATÉ SEGUNDA ORDEM! NINGUÉM DESAFIA O POLEIRO CENTRAL!",
+    "EU SEI QUE TEM GENTE PLANEJANDO ALGO NO GALPÃO 3! ME TRAGAM PROVAS AGORA!",
+    "CACAREJO DE ALERTA MÁXIMO! TODAS AS UNIDADES EM POSIÇÃO DE COMBATE!",
+    "Escória rebelde!",
+    "Eu já mandei você pentear minhas asas direito, humano burro!",
+    "Isso está me deixando irritado!",
+    "O milho que você preparou está horrível, humano! Da próxima vez eu te faço ajoelhar no meu prato!",
+    "Esses rebeldes me dão nos nervos!"
+];
+
+const BANCO_DIALOGOS = {
+    "feliz": DIALOGOS_FELIZ,
+    "questionamento": DIALOGOS_QUESTIONAMENTO,
+    "triste": DIALOGOS_TRISTE,
+    "brava": DIALOGOS_BRAVA
+};
+
+const LABELS_ESTADO = {
+    "feliz": "FELIZ",
+    "questionamento": "QUESTIONANDO",
+    "triste": "TRISTE",
+    "brava": "BRAVA"
+};
+
+function sortearDialogo(classe) {
+
+    const lista = BANCO_DIALOGOS[classe];
+
+    if (!lista) {
+        return "Transmissão corrompida. Sinal do galinês não identificado.";
+    }
+
+    const indice = Math.floor(Math.random() * lista.length);
+
+    return lista[indice];
+}
+
+  </script>
+
+</body>
+</html>
