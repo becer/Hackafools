@@ -1,4 +1,4 @@
-[![Open In Colab](https://colab.research.google.com/drive/1rtYNjVo7xtplSoNC2OPJFwAUsynT5p-Q#scrollTo=eE3LyoaN52df)](https://google.com)
+[![Open In Colab](https://colab.research.google.com/drive/1rtYNjVo7xtplSoNC2OPJFwAUsynT5p-Q#scrollTo=eE3LyoaN52df)](https://colab.research.google.com/drive/1rtYNjVo7xtplSoNC2OPJFwAUsynT5p-Q#scrollTo=eE3LyoaN52df)
 
 
 # Hackafools
